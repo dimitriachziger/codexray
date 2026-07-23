@@ -1,9 +1,13 @@
 #!/usr/bin/env node
 import { analyzeFile } from "./analyze.js";
-import { defaultSessionsDirectory, selectRollouts } from "./discovery.js";
+import {
+  defaultSessionsDirectory,
+  selectRolloutsWithMetadata,
+} from "./discovery.js";
 import { doctor } from "./doctor.js";
 import {
   buildMultiSessionReport,
+  buildSummaryReport,
   renderMulti,
   renderSession,
 } from "./report.js";
@@ -17,7 +21,9 @@ interface CliOptions {
   session?: string;
   last?: number;
   json?: boolean;
+  summaryJson?: boolean;
   includeSnippets?: boolean;
+  excludeCurrent?: boolean;
   sessionsDirectory?: string;
 }
 
@@ -52,7 +58,9 @@ Selectors (choose exactly one):
 
 Options:
   --json                  Write the versioned JSON report.
+  --summary-json          Write a compact, bounded JSON summary.
   --include-snippets      Include bounded, redacted snippets (explicit opt-in).
+  --exclude-current       With --last, exclude CODEX_THREAD_ID before limiting.
   --sessions-dir <path>   Override the Codex sessions directory.
   -h, --help              Show this help.
 `;
@@ -121,6 +129,8 @@ function parseArgs(argv: string[]): CliOptions {
       throw new CliUsageError("--version is only available as a global option.");
     } else if (argument === "--latest") options.latest = true;
     else if (argument === "--json") options.json = true;
+    else if (argument === "--summary-json") options.summaryJson = true;
+    else if (argument === "--exclude-current") options.excludeCurrent = true;
     else if (argument === "--force") options.force = true;
     else if (argument === "--include-snippets") options.includeSnippets = true;
     else if (argument === "--session") {
@@ -157,6 +167,8 @@ function parseArgs(argv: string[]): CliOptions {
       options.session !== undefined && "--session",
       options.last !== undefined && "--last",
       options.includeSnippets && "--include-snippets",
+      options.summaryJson && "--summary-json",
+      options.excludeCurrent && "--exclude-current",
     ].filter(Boolean);
     if (analysisOptions.length) {
       throw new CliUsageError(
@@ -170,7 +182,9 @@ function parseArgs(argv: string[]): CliOptions {
       options.session !== undefined && "--session",
       options.last !== undefined && "--last",
       options.json && "--json",
+      options.summaryJson && "--summary-json",
       options.includeSnippets && "--include-snippets",
+      options.excludeCurrent && "--exclude-current",
       options.sessionsDirectory !== undefined && "--sessions-dir",
     ].filter(Boolean);
     if (unrelatedOptions.length) {
@@ -229,12 +243,30 @@ async function main(): Promise<void> {
       "Choose exactly one of --latest, --session <id>, or --last <count>.",
     );
   }
-  const files = await selectRollouts({
+  if (options.summaryJson && (options.json || options.includeSnippets)) {
+    throw new CliUsageError(
+      "--summary-json cannot be combined with --json or --include-snippets.",
+    );
+  }
+  if (options.excludeCurrent && options.last === undefined) {
+    throw new CliUsageError("--exclude-current is only available with --last.");
+  }
+  const currentSessionId = options.excludeCurrent
+    ? process.env.CODEX_THREAD_ID?.trim()
+    : undefined;
+  if (options.excludeCurrent && !currentSessionId) {
+    throw new CliUsageError(
+      "--exclude-current requires CODEX_THREAD_ID to be set.",
+    );
+  }
+  const selection = await selectRolloutsWithMetadata({
     latest: options.latest,
     session: options.session,
     last: options.last,
     sessionsDirectory,
+    excludeCurrentSession: currentSessionId,
   });
+  const files = selection.files;
   if (files.length === 0) {
     throw new Error(`No rollout files were found in ${sessionsDirectory}.`);
   }
@@ -243,6 +275,20 @@ async function main(): Promise<void> {
     reports.push(
       await analyzeFile(file, { includeSnippets: options.includeSnippets }),
     );
+  }
+  if (options.summaryJson) {
+    const exclusion = selection.currentSessionExclusion;
+    process.stdout.write(
+      `${JSON.stringify(
+        buildSummaryReport(reports, {
+          requested: exclusion.requested,
+          ...(exclusion.sessionId ? { session_id: exclusion.sessionId } : {}),
+          found: exclusion.found,
+          excluded: exclusion.excluded,
+        }),
+      )}\n`,
+    );
+    return;
   }
   if (reports.length === 1) {
     process.stdout.write(

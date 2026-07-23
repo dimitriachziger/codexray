@@ -1,6 +1,6 @@
 import { readdir, stat } from "node:fs/promises";
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 
 export function defaultSessionsDirectory(): string {
   return (
@@ -52,8 +52,37 @@ export async function selectRollouts(options: {
   session?: string;
   last?: number;
   sessionsDirectory?: string;
+  excludeCurrentSession?: string;
 }): Promise<string[]> {
+  return (await selectRolloutsWithMetadata(options)).files;
+}
+
+export interface RolloutSelection {
+  files: string[];
+  currentSessionExclusion: {
+    requested: boolean;
+    sessionId?: string;
+    found: boolean;
+    excluded: boolean;
+  };
+}
+
+export async function selectRolloutsWithMetadata(options: {
+  latest?: boolean;
+  session?: string;
+  last?: number;
+  sessionsDirectory?: string;
+  excludeCurrentSession?: string;
+}): Promise<RolloutSelection> {
   const files = await listRollouts(options.sessionsDirectory);
+  const exclusion = {
+    requested: options.excludeCurrentSession !== undefined,
+    ...(options.excludeCurrentSession !== undefined
+      ? { sessionId: options.excludeCurrentSession }
+      : {}),
+    found: false,
+    excluded: false,
+  };
   if (options.session) {
     const matches = files.filter((file) => file.includes(options.session!));
     if (matches.length === 0) {
@@ -62,9 +91,29 @@ export async function selectRollouts(options: {
     if (matches.length > 1) {
       throw new Error(`Session id ${options.session} matched more than one rollout.`);
     }
-    return matches;
+    return { files: matches, currentSessionExclusion: exclusion };
   }
-  if (options.last !== undefined) return files.slice(0, options.last);
-  if (options.latest) return files.slice(0, 1);
+  if (options.last !== undefined) {
+    const filtered =
+      options.excludeCurrentSession === undefined
+        ? files
+        : files.filter(
+            (file) => !basename(file).includes(options.excludeCurrentSession!),
+          );
+    if (options.excludeCurrentSession !== undefined) {
+      exclusion.found = filtered.length !== files.length;
+      exclusion.excluded = exclusion.found;
+    }
+    return {
+      files: filtered.slice(0, options.last),
+      currentSessionExclusion: exclusion,
+    };
+  }
+  if (options.latest) {
+    return {
+      files: files.slice(0, 1),
+      currentSessionExclusion: exclusion,
+    };
+  }
   throw new Error("Choose exactly one of --latest, --session <id>, or --last <count>.");
 }

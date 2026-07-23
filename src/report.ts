@@ -10,6 +10,7 @@ import {
   type MultiSessionReport,
   type Recommendation,
   type SessionReport,
+  type SummaryReport,
 } from "./types.js";
 
 function confidence(input: number, visible: number): Confidence {
@@ -153,6 +154,116 @@ export function buildMultiSessionReport(
       })),
     ),
     sessions,
+  };
+}
+
+export function buildSummaryReport(
+  sessions: SessionReport[],
+  currentSessionExclusion: SummaryReport["current_session_exclusion"] = {
+    requested: false,
+    found: false,
+    excluded: false,
+  },
+): SummaryReport {
+  const aggregate = buildMultiSessionReport(sessions);
+  const visibleByCategory = {
+    instructions: 0,
+    user: 0,
+    assistant: 0,
+    tool_call: 0,
+    tool_output: 0,
+  };
+  for (const report of sessions) {
+    for (const turn of report.turns) {
+      for (const step of turn.model_steps) {
+        for (const category of [
+          "instructions",
+          "user",
+          "assistant",
+          "tool_call",
+          "tool_output",
+        ] as const) {
+          visibleByCategory[category] += step.visible_by_category[category];
+        }
+      }
+    }
+  }
+
+  const findingCounts: SummaryReport["findings"] = {
+    total: aggregate.findings.length,
+    by_kind: {
+      duplicate_output: 0,
+      similar_output: 0,
+      large_output: 0,
+    },
+    by_confidence: { high: 0, medium: 0, low: 0 },
+  };
+  for (const finding of aggregate.findings) {
+    findingCounts.by_kind[finding.kind] += 1;
+    findingCounts.by_confidence[finding.confidence] += 1;
+  }
+
+  const warnings = sessions.flatMap((report) =>
+    report.warnings.map((warning) => ({
+      session_id: report.session.id,
+      ...warning,
+    })),
+  );
+  const topCostliestSessions = sessions
+    .map((report) => ({
+      session_id: report.session.id,
+      ...(report.session.timestamp ? { timestamp: report.session.timestamp } : {}),
+      total_tokens: report.accounting.total_tokens,
+      input_tokens: report.accounting.input_tokens,
+      output_tokens: report.accounting.output_tokens,
+      retained_context_load: report.top_retained_context.reduce(
+        (sum, item) => sum + item.retained_context_load,
+        0,
+      ),
+    }))
+    .sort(
+      (a, b) =>
+        b.total_tokens - a.total_tokens ||
+        b.input_tokens - a.input_tokens ||
+        a.session_id.localeCompare(b.session_id),
+    )
+    .slice(0, 5);
+  const topRetainedContext = sessions
+    .flatMap((report) =>
+      report.top_retained_context.map(({ snippet: _snippet, ...item }) => ({
+        session_id: report.session.id,
+        ...item,
+      })),
+    )
+    .sort(
+      (a, b) =>
+        b.retained_context_load - a.retained_context_load ||
+        b.estimated_tokens - a.estimated_tokens ||
+        a.session_id.localeCompare(b.session_id) ||
+        a.id.localeCompare(b.id),
+    )
+    .slice(0, 5);
+
+  return {
+    schema_version: SCHEMA_VERSION,
+    report_kind: "summary",
+    generated_at: aggregate.generated_at,
+    session_count: sessions.length,
+    current_session_exclusion: currentSessionExclusion,
+    accounting: aggregate.accounting,
+    coverage: aggregate.coverage,
+    visible_by_category: visibleByCategory,
+    findings: findingCounts,
+    recommendations:
+      sessions.length === 1
+        ? sessions[0]!.recommendations
+        : aggregate.recommendations,
+    warnings: {
+      count: warnings.length,
+      examples: warnings.slice(0, 5),
+    },
+    top_costliest_sessions: topCostliestSessions,
+    top_retained_context: topRetainedContext,
   };
 }
 

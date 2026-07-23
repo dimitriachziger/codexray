@@ -2,13 +2,16 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://raw.githubusercontent.com/dimitriachziger/codexray/main/schemas/report.schema.json",
   "title": "Codex Token Analyzer Report",
-  "description": "The public JSON contract for single- and multi-session Codexray reports.",
+  "description": "The public JSON contract for full and summary Codexray reports.",
   "oneOf": [
     {
       "$ref": "#/$defs/sessionReport"
     },
     {
       "$ref": "#/$defs/multiSessionReport"
+    },
+    {
+      "$ref": "#/$defs/summaryReport"
     }
   ],
   "$defs": {
@@ -445,6 +448,198 @@
       },
       "additionalProperties": false
     },
+    "summaryWarning": {
+      "type": "object",
+      "required": [
+        "session_id",
+        "code",
+        "message"
+      ],
+      "properties": {
+        "session_id": {
+          "type": "string"
+        },
+        "code": {
+          "type": "string"
+        },
+        "message": {
+          "type": "string"
+        },
+        "line": {
+          "type": "integer",
+          "minimum": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "currentSessionExclusion": {
+      "type": "object",
+      "required": [
+        "requested",
+        "found",
+        "excluded"
+      ],
+      "properties": {
+        "requested": {
+          "type": "boolean"
+        },
+        "session_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "found": {
+          "type": "boolean"
+        },
+        "excluded": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "summaryFindingCounts": {
+      "type": "object",
+      "required": [
+        "total",
+        "by_kind",
+        "by_confidence"
+      ],
+      "properties": {
+        "total": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "by_kind": {
+          "type": "object",
+          "required": [
+            "duplicate_output",
+            "similar_output",
+            "large_output"
+          ],
+          "properties": {
+            "duplicate_output": {
+              "$ref": "#/$defs/nonNegativeInteger"
+            },
+            "similar_output": {
+              "$ref": "#/$defs/nonNegativeInteger"
+            },
+            "large_output": {
+              "$ref": "#/$defs/nonNegativeInteger"
+            }
+          },
+          "additionalProperties": false
+        },
+        "by_confidence": {
+          "type": "object",
+          "required": [
+            "high",
+            "medium",
+            "low"
+          ],
+          "properties": {
+            "high": {
+              "$ref": "#/$defs/nonNegativeInteger"
+            },
+            "medium": {
+              "$ref": "#/$defs/nonNegativeInteger"
+            },
+            "low": {
+              "$ref": "#/$defs/nonNegativeInteger"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "summaryWarnings": {
+      "type": "object",
+      "required": [
+        "count",
+        "examples"
+      ],
+      "properties": {
+        "count": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "examples": {
+          "type": "array",
+          "maxItems": 5,
+          "items": {
+            "$ref": "#/$defs/summaryWarning"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "summarySession": {
+      "type": "object",
+      "required": [
+        "session_id",
+        "total_tokens",
+        "input_tokens",
+        "output_tokens",
+        "retained_context_load"
+      ],
+      "properties": {
+        "session_id": {
+          "type": "string"
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "total_tokens": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "input_tokens": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "output_tokens": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "retained_context_load": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        }
+      },
+      "additionalProperties": false
+    },
+    "summaryRetainedContext": {
+      "type": "object",
+      "required": [
+        "session_id",
+        "id",
+        "category",
+        "estimated_tokens",
+        "retained_steps",
+        "retained_context_load"
+      ],
+      "properties": {
+        "session_id": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "category": {
+          "$ref": "#/$defs/itemCategory"
+        },
+        "estimated_tokens": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "retained_steps": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "retained_context_load": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "turn_id": {
+          "type": "string"
+        },
+        "target": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
     "sessionReport": {
       "type": "object",
       "required": [
@@ -556,6 +751,78 @@
           "type": "array",
           "items": {
             "$ref": "#/$defs/sessionReport"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "summaryReport": {
+      "type": "object",
+      "required": [
+        "schema_version",
+        "report_kind",
+        "generated_at",
+        "session_count",
+        "current_session_exclusion",
+        "accounting",
+        "coverage",
+        "visible_by_category",
+        "findings",
+        "recommendations",
+        "warnings",
+        "top_costliest_sessions",
+        "top_retained_context"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "1.0.0"
+        },
+        "report_kind": {
+          "const": "summary"
+        },
+        "generated_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "session_count": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "current_session_exclusion": {
+          "$ref": "#/$defs/currentSessionExclusion"
+        },
+        "accounting": {
+          "$ref": "#/$defs/accounting"
+        },
+        "coverage": {
+          "$ref": "#/$defs/coverage"
+        },
+        "visible_by_category": {
+          "$ref": "#/$defs/categoryTokens"
+        },
+        "findings": {
+          "$ref": "#/$defs/summaryFindingCounts"
+        },
+        "recommendations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/recommendation"
+          }
+        },
+        "warnings": {
+          "$ref": "#/$defs/summaryWarnings"
+        },
+        "top_costliest_sessions": {
+          "type": "array",
+          "maxItems": 5,
+          "items": {
+            "$ref": "#/$defs/summarySession"
+          }
+        },
+        "top_retained_context": {
+          "type": "array",
+          "maxItems": 5,
+          "items": {
+            "$ref": "#/$defs/summaryRetainedContext"
           }
         }
       },

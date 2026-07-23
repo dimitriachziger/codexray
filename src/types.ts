@@ -179,3 +179,46 @@ export interface MultiSessionReport {
   warnings: ParseWarning[];
   sessions: SessionReport[];
 }
+
+export interface SummaryWarning extends ParseWarning {
+  session_id: string;
+}
+
+export interface SummaryReport {
+  schema_version: typeof SCHEMA_VERSION;
+  report_kind: "summary";
+  generated_at: string;
+  session_count: number;
+  current_session_exclusion: {
+    requested: boolean;
+    session_id?: string;
+    found: boolean;
+    excluded: boolean;
+  };
+  accounting: Accounting;
+  coverage: SessionReport["coverage"];
+  visible_by_category: CategoryTokens;
+  findings: {
+    total: number;
+    by_kind: Record<Finding["kind"], number>;
+    by_confidence: Record<Confidence, number>;
+  };
+  recommendations: Recommendation[];
+  warnings: {
+    count: number;
+    examples: SummaryWarning[];
+  };
+  top_costliest_sessions: Array<{
+    session_id: string;
+    timestamp?: string;
+    total_tokens: number;
+    input_tokens: number;
+    output_tokens: number;
+    retained_context_load: number;
+  }>;
+  top_retained_context: Array<
+    Omit<PublicItem, "snippet"> & {
+      session_id: string;
+    }
+  >;
+}
