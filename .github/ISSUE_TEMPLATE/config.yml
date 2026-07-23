@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Private security or privacy report
+    url: https://github.com/dimitriachziger/codexray/security/advisories/new
+    about: Report vulnerabilities and sensitive-data exposure privately.

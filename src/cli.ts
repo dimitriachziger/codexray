@@ -18,18 +18,51 @@ interface CliOptions {
   sessionsDirectory?: string;
 }
 
-const HELP = `codex-token-analyzer
+const VERSION = "0.1.0";
+
+const HELP = `Codexray — Codex Token Analyzer
 
 Usage:
-  codex-token-analyzer analyze --latest [--json] [--include-snippets]
-  codex-token-analyzer analyze --session <id> [--json] [--include-snippets]
-  codex-token-analyzer analyze --last <count> [--json] [--include-snippets]
-  codex-token-analyzer doctor [--json]
+  codex-token-analyzer <command> [options]
+
+Commands:
+  analyze  Analyze one or more rollout files.
+  doctor   Check the sessions directory and supported rollout events.
 
 Options:
-  --sessions-dir <path>  Override the Codex sessions directory.
-  --include-snippets     Include bounded, redacted raw snippets (explicit opt-in).
+  -h, --help     Show help.
+  -v, --version  Show the version.
+
+Run "codex-token-analyzer <command> --help" for command-specific help.
 `;
+
+const ANALYZE_HELP = `Usage:
+  codex-token-analyzer analyze --latest [options]
+  codex-token-analyzer analyze --session <id> [options]
+  codex-token-analyzer analyze --last <count> [options]
+
+Selectors (choose exactly one):
+  --latest               Analyze the newest rollout.
+  --session <id>         Analyze the rollout matching a session id.
+  --last <count>         Analyze the newest 1–20 rollouts.
+
+Options:
+  --json                  Write the versioned JSON report.
+  --include-snippets      Include bounded, redacted snippets (explicit opt-in).
+  --sessions-dir <path>   Override the Codex sessions directory.
+  -h, --help              Show this help.
+`;
+
+const DOCTOR_HELP = `Usage:
+  codex-token-analyzer doctor [options]
+
+Options:
+  --json                  Write the doctor result as JSON.
+  --sessions-dir <path>   Override the Codex sessions directory.
+  -h, --help              Show this help.
+`;
+
+class CliUsageError extends Error {}
 
 function parseArgs(argv: string[]): CliOptions {
   const options: CliOptions = {};
@@ -37,31 +70,56 @@ function parseArgs(argv: string[]): CliOptions {
   if (command === "analyze" || command === "doctor") options.command = command;
   else if (command === "--help" || command === "-h" || command === undefined) {
     process.stdout.write(HELP);
-    process.exit(0);
+    return options;
+  } else if (command === "--version" || command === "-v") {
+    process.stdout.write(`${VERSION}\n`);
+    return options;
   } else {
-    throw new Error(`Unknown command: ${command}`);
+    throw new CliUsageError(`Unknown command: ${command}`);
   }
   while (argv.length) {
     const argument = argv.shift()!;
-    if (argument === "--latest") options.latest = true;
+    if (argument === "--help" || argument === "-h") {
+      process.stdout.write(options.command === "analyze" ? ANALYZE_HELP : DOCTOR_HELP);
+      return {};
+    } else if (argument === "--version" || argument === "-v") {
+      throw new CliUsageError("--version is only available as a global option.");
+    } else if (argument === "--latest") options.latest = true;
     else if (argument === "--json") options.json = true;
     else if (argument === "--include-snippets") options.includeSnippets = true;
     else if (argument === "--session") {
       const value = argv.shift();
-      if (!value) throw new Error("--session requires an id.");
+      if (!value || value.startsWith("-")) {
+        throw new CliUsageError("--session requires an id.");
+      }
       options.session = value;
     } else if (argument === "--last") {
       const value = Number(argv.shift());
       if (!Number.isInteger(value) || value < 1 || value > 20) {
-        throw new Error("--last must be an integer between 1 and 20.");
+        throw new CliUsageError("--last must be an integer between 1 and 20.");
       }
       options.last = value;
     } else if (argument === "--sessions-dir") {
       const value = argv.shift();
-      if (!value) throw new Error("--sessions-dir requires a path.");
+      if (!value || value.startsWith("-")) {
+        throw new CliUsageError("--sessions-dir requires a path.");
+      }
       options.sessionsDirectory = value;
     } else {
-      throw new Error(`Unknown option: ${argument}`);
+      throw new CliUsageError(`Unknown option: ${argument}`);
+    }
+  }
+  if (options.command === "doctor") {
+    const analysisOptions = [
+      options.latest && "--latest",
+      options.session !== undefined && "--session",
+      options.last !== undefined && "--last",
+      options.includeSnippets && "--include-snippets",
+    ].filter(Boolean);
+    if (analysisOptions.length) {
+      throw new CliUsageError(
+        `doctor does not accept analysis option(s): ${analysisOptions.join(", ")}.`,
+      );
     }
   }
   return options;
@@ -69,6 +127,7 @@ function parseArgs(argv: string[]): CliOptions {
 
 async function main(): Promise<void> {
   const options = parseArgs(process.argv.slice(2));
+  if (!options.command) return;
   const sessionsDirectory =
     options.sessionsDirectory ?? defaultSessionsDirectory();
   if (options.command === "doctor") {
@@ -96,7 +155,9 @@ async function main(): Promise<void> {
   const selectors = [options.latest, options.session !== undefined, options.last !== undefined]
     .filter(Boolean).length;
   if (selectors !== 1) {
-    throw new Error("Choose exactly one of --latest, --session <id>, or --last <count>.");
+    throw new CliUsageError(
+      "Choose exactly one of --latest, --session <id>, or --last <count>.",
+    );
   }
   const files = await selectRollouts({
     latest: options.latest,
@@ -104,6 +165,9 @@ async function main(): Promise<void> {
     last: options.last,
     sessionsDirectory,
   });
+  if (files.length === 0) {
+    throw new Error(`No rollout files were found in ${sessionsDirectory}.`);
+  }
   const reports: Awaited<ReturnType<typeof analyzeFile>>[] = [];
   for (const file of files) {
     reports.push(
@@ -129,5 +193,10 @@ async function main(): Promise<void> {
 main().catch((error: unknown) => {
   const message = error instanceof Error ? error.message : String(error);
   process.stderr.write(`Error: ${message}\n`);
-  process.exitCode = 1;
+  if (error instanceof CliUsageError) {
+    process.stderr.write('Run "codex-token-analyzer --help" for usage.\n');
+    process.exitCode = 2;
+  } else {
+    process.exitCode = 1;
+  }
 });

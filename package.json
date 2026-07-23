@@ -2,6 +2,16 @@
   "name": "codex-token-analyzer",
   "version": "0.1.0",
   "description": "Offline accounting and context attribution for Codex rollout files",
+  "private": true,
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dimitriachziger/codexray.git"
+  },
+  "homepage": "https://github.com/dimitriachziger/codexray#readme",
+  "bugs": {
+    "url": "https://github.com/dimitriachziger/codexray/issues"
+  },
   "type": "module",
   "bin": {
     "codex-token-analyzer": "./dist/src/cli.js"
@@ -13,7 +23,7 @@
     "skill"
   ],
   "engines": {
-    "node": ">=20"
+    "node": ">=22"
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
@@ -25,6 +35,7 @@
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
+    "ajv": "^8.20.0",
     "typescript": "^5.8.3"
   }
 }

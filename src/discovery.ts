@@ -27,7 +27,18 @@ async function collect(directory: string, output: string[]): Promise<void> {
 
 export async function listRollouts(directory = defaultSessionsDirectory()): Promise<string[]> {
   const files: string[] = [];
-  await collect(directory, files);
+  try {
+    await collect(directory, files);
+  } catch (error) {
+    const code =
+      error && typeof error === "object" && "code" in error
+        ? String(error.code)
+        : undefined;
+    if (code === "ENOENT" || code === "ENOTDIR" || code === "EACCES") {
+      throw new Error(`Sessions directory is not readable: ${directory}.`);
+    }
+    throw error;
+  }
   const dated = await Promise.all(
     files.map(async (file) => ({ file, mtime: (await stat(file)).mtimeMs })),
   );
