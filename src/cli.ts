@@ -7,9 +7,12 @@ import {
   renderMulti,
   renderSession,
 } from "./report.js";
+import { installSkill } from "./skill.js";
 
 interface CliOptions {
-  command?: "analyze" | "doctor";
+  command?: "analyze" | "doctor" | "skill";
+  force?: boolean;
+  skillsDirectory?: string;
   latest?: boolean;
   session?: string;
   last?: number;
@@ -28,6 +31,7 @@ Usage:
 Commands:
   analyze  Analyze one or more rollout files.
   doctor   Check the sessions directory and supported rollout events.
+  skill    Manage the bundled Codex skill.
 
 Options:
   -h, --help     Show help.
@@ -62,12 +66,23 @@ Options:
   -h, --help              Show this help.
 `;
 
+const SKILL_HELP = `Usage:
+  codex-token-analyzer skill install [options]
+
+Options:
+  --force                 Replace an existing installation.
+  --skills-dir <path>     Override the user skills directory.
+  -h, --help              Show this help.
+`;
+
 class CliUsageError extends Error {}
 
 function parseArgs(argv: string[]): CliOptions {
   const options: CliOptions = {};
   const command = argv.shift();
-  if (command === "analyze" || command === "doctor") options.command = command;
+  if (command === "analyze" || command === "doctor" || command === "skill") {
+    options.command = command;
+  }
   else if (command === "--help" || command === "-h" || command === undefined) {
     process.stdout.write(HELP);
     return options;
@@ -77,15 +92,36 @@ function parseArgs(argv: string[]): CliOptions {
   } else {
     throw new CliUsageError(`Unknown command: ${command}`);
   }
+  if (options.command === "skill") {
+    const skillCommand = argv.shift();
+    if (skillCommand === "--help" || skillCommand === "-h") {
+      process.stdout.write(SKILL_HELP);
+      return {};
+    }
+    if (skillCommand !== "install") {
+      throw new CliUsageError(
+        skillCommand
+          ? `Unknown skill command: ${skillCommand}`
+          : "skill requires the install command.",
+      );
+    }
+  }
   while (argv.length) {
     const argument = argv.shift()!;
     if (argument === "--help" || argument === "-h") {
-      process.stdout.write(options.command === "analyze" ? ANALYZE_HELP : DOCTOR_HELP);
+      process.stdout.write(
+        options.command === "analyze"
+          ? ANALYZE_HELP
+          : options.command === "doctor"
+            ? DOCTOR_HELP
+            : SKILL_HELP,
+      );
       return {};
     } else if (argument === "--version" || argument === "-v") {
       throw new CliUsageError("--version is only available as a global option.");
     } else if (argument === "--latest") options.latest = true;
     else if (argument === "--json") options.json = true;
+    else if (argument === "--force") options.force = true;
     else if (argument === "--include-snippets") options.includeSnippets = true;
     else if (argument === "--session") {
       const value = argv.shift();
@@ -105,6 +141,12 @@ function parseArgs(argv: string[]): CliOptions {
         throw new CliUsageError("--sessions-dir requires a path.");
       }
       options.sessionsDirectory = value;
+    } else if (argument === "--skills-dir") {
+      const value = argv.shift();
+      if (!value || value.startsWith("-")) {
+        throw new CliUsageError("--skills-dir requires a path.");
+      }
+      options.skillsDirectory = value;
     } else {
       throw new CliUsageError(`Unknown option: ${argument}`);
     }
@@ -122,12 +164,40 @@ function parseArgs(argv: string[]): CliOptions {
       );
     }
   }
+  if (options.command === "skill") {
+    const unrelatedOptions = [
+      options.latest && "--latest",
+      options.session !== undefined && "--session",
+      options.last !== undefined && "--last",
+      options.json && "--json",
+      options.includeSnippets && "--include-snippets",
+      options.sessionsDirectory !== undefined && "--sessions-dir",
+    ].filter(Boolean);
+    if (unrelatedOptions.length) {
+      throw new CliUsageError(
+        `skill install does not accept option(s): ${unrelatedOptions.join(", ")}.`,
+      );
+    }
+  }
+  if (options.command !== "skill" && (options.force || options.skillsDirectory)) {
+    throw new CliUsageError(
+      "--force and --skills-dir are only available for skill install.",
+    );
+  }
   return options;
 }
 
 async function main(): Promise<void> {
   const options = parseArgs(process.argv.slice(2));
   if (!options.command) return;
+  if (options.command === "skill") {
+    const destination = await installSkill({
+      force: options.force,
+      skillsDirectory: options.skillsDirectory,
+    });
+    process.stdout.write(`Installed explain-codex-token-usage to ${destination}\n`);
+    return;
+  }
   const sessionsDirectory =
     options.sessionsDirectory ?? defaultSessionsDirectory();
   if (options.command === "doctor") {

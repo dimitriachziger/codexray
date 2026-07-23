@@ -20,7 +20,7 @@
     "dist/src",
     "README.md",
     "schemas",
-    "skill"
+    ".agents/skills"
   ],
   "engines": {
     "node": ">=22"

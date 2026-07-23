@@ -6,6 +6,11 @@ project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- Repo-local Codex skill discovery under `.agents/skills` and an explicit
+  user-wide installer via `codex-token-analyzer skill install`.
+
 ## [0.1.0] - 2026-07-23
 
 ### Added

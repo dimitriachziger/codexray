@@ -20,13 +20,17 @@ cd codexray
 npm ci
 npm test
 npm link
+codex-token-analyzer skill install
 codex-token-analyzer doctor
 codex-token-analyzer analyze --latest
 ```
 
 `gpt-tokenizer` is the only runtime dependency. Run
 `npm unlink --global codex-token-analyzer` when you no longer want the linked
-development command.
+development command. The skill installer copies the bundled skill to
+`~/.agents/skills/explain-codex-token-usage`, where Codex can use it in every
+repository. It refuses to replace an existing installation unless you pass
+`--force`.
 
 Example output:
 
@@ -46,6 +50,7 @@ Session 0198-example
 codex-token-analyzer --help
 codex-token-analyzer --version
 codex-token-analyzer doctor
+codex-token-analyzer skill install
 codex-token-analyzer analyze --latest
 codex-token-analyzer analyze --session <id>
 codex-token-analyzer analyze --last 20
@@ -123,9 +128,11 @@ the test fixtures are validated against that schema in CI.
 
 ## Skill
 
-[`skill/explain-codex-token-usage`](skill/explain-codex-token-usage/SKILL.md)
+[`.agents/skills/explain-codex-token-usage`](.agents/skills/explain-codex-token-usage/SKILL.md)
 is a thin Codex skill. It invokes the CLI and explains only the redacted JSON;
-it does not read rollout files itself.
+it does not read rollout files itself. Codex discovers it automatically while
+working in this repository. Run `codex-token-analyzer skill install` to make it
+available user-wide under `~/.agents/skills`.
 
 ## Contributing and security
 
