@@ -1,0 +1,261 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/codex-token-analyzer/report.schema.json",
+  "title": "Codex Token Analyzer Report",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "accounting",
+    "coverage",
+    "findings",
+    "recommendations",
+    "warnings"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.0.0"
+    },
+    "accounting": {
+      "$ref": "#/$defs/accounting"
+    },
+    "coverage": {
+      "$ref": "#/$defs/coverage"
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/finding"
+      }
+    },
+    "recommendations": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/recommendation"
+      }
+    },
+    "warnings": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/warning"
+      }
+    },
+    "session": {
+      "type": "object"
+    },
+    "sessions": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    }
+  },
+  "oneOf": [
+    {
+      "required": [
+        "session",
+        "turns",
+        "top_retained_context"
+      ],
+      "not": {
+        "required": [
+          "sessions"
+        ]
+      }
+    },
+    {
+      "required": [
+        "sessions",
+        "session_count",
+        "generated_at"
+      ],
+      "not": {
+        "required": [
+          "session"
+        ]
+      }
+    }
+  ],
+  "$defs": {
+    "nonNegativeInteger": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "confidence": {
+      "enum": [
+        "high",
+        "medium",
+        "low"
+      ]
+    },
+    "accounting": {
+      "type": "object",
+      "required": [
+        "input_tokens",
+        "cached_input_tokens",
+        "output_tokens",
+        "reasoning_output_tokens",
+        "total_tokens",
+        "model_steps",
+        "turns"
+      ],
+      "properties": {
+        "input_tokens": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "cached_input_tokens": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "cache_write_input_tokens": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "output_tokens": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "reasoning_output_tokens": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "total_tokens": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "model_steps": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "turns": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        }
+      },
+      "additionalProperties": false
+    },
+    "coverage": {
+      "type": "object",
+      "required": [
+        "estimated_visible_input_tokens",
+        "unattributed_input_tokens",
+        "visible_overage_tokens",
+        "ratio",
+        "reconstruction_confidence",
+        "encoding",
+        "encoding_fallback"
+      ],
+      "properties": {
+        "estimated_visible_input_tokens": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "unattributed_input_tokens": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "visible_overage_tokens": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "ratio": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "reconstruction_confidence": {
+          "$ref": "#/$defs/confidence"
+        },
+        "encoding": {
+          "type": "string"
+        },
+        "encoding_fallback": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "finding": {
+      "type": "object",
+      "required": [
+        "id",
+        "kind",
+        "severity",
+        "confidence",
+        "evidence",
+        "message"
+      ],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "duplicate_output",
+            "similar_output",
+            "large_output"
+          ]
+        },
+        "severity": {
+          "enum": [
+            "info",
+            "warning"
+          ]
+        },
+        "confidence": {
+          "$ref": "#/$defs/confidence"
+        },
+        "evidence": {
+          "type": "object"
+        },
+        "message": {
+          "type": "string"
+        }
+      }
+    },
+    "recommendation": {
+      "type": "object",
+      "required": [
+        "id",
+        "kind",
+        "confidence",
+        "evidence",
+        "estimated_avoidable_context_load",
+        "message"
+      ],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "workflow",
+            "agents_rule_candidate"
+          ]
+        },
+        "confidence": {
+          "$ref": "#/$defs/confidence"
+        },
+        "evidence": {
+          "type": "string"
+        },
+        "estimated_avoidable_context_load": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "message": {
+          "type": "string"
+        },
+        "session_count": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        }
+      }
+    },
+    "warning": {
+      "type": "object",
+      "required": [
+        "code",
+        "message"
+      ],
+      "properties": {
+        "code": {
+          "type": "string"
+        },
+        "message": {
+          "type": "string"
+        },
+        "line": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        }
+      }
+    }
+  }
+}

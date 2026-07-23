@@ -1,0 +1,30 @@
+{
+  "name": "codex-token-analyzer",
+  "version": "0.1.0",
+  "description": "Offline accounting and context attribution for Codex rollout files",
+  "type": "module",
+  "bin": {
+    "codex-token-analyzer": "./dist/src/cli.js"
+  },
+  "files": [
+    "dist/src",
+    "README.md",
+    "schemas",
+    "skill"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "npm run build && node --test dist/test/*.test.js",
+    "start": "node dist/src/cli.js"
+  },
+  "dependencies": {
+    "gpt-tokenizer": "^3.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "typescript": "^5.8.3"
+  }
+}

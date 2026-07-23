@@ -1,0 +1,4 @@
+interface:
+  display_name: "Explain Codex Token Usage"
+  short_description: "Explain redacted Codex token analysis"
+  default_prompt: "Use $explain-codex-token-usage to analyze my latest Codex session and explain the redacted findings."
